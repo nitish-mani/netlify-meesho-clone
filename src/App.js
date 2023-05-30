@@ -1,50 +1,157 @@
-import React, { Component } from "react"
-import logo from "./logo.svg"
-import "./App.css"
+// import logo from "./logo.svg";
+import "./App.css";
+import Nav_bar1 from "./component/nav_bar1/nav_bar.component";
+import NavBar2 from "./component/nav-bar2/nav-bar2.component";
 
-class LambdaDemo extends Component {
-  constructor(props) {
-    super(props)
-    this.state = { loading: false, msg: null }
+import Home from "./component/home/home";
+import axios from "axios";
+import DataApi from "./context/dataApi";
+import { useContext, useEffect, useState } from "react";
+import DetailCard from "./component/detail_card/detailCard";
+import { createBrowserRouter, Outlet, RouterProvider } from "react-router-dom";
+import cartContext from "./context/authContext";
+import Cart from "./component/cart/cart";
+import dataApi from "./context/dataApi";
+import OrderPage from "./component/orderPage/orderPage";
+import Login from "./component/login/login";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { useNavigate } from "react-router-dom";
+// import "./Dashboard.css";
+import Payment from "./component/payment/payment";
+import Bank from "./component/bank/bank";
+import Ccard from "./component/ccard/ccard";
+import { db, logInWithEmailAndPassword } from "./component/firebase/firebase";
+import { query, collection, getDocs, where } from "firebase/firestore";
+function App() {
+  const [data, setData] = useState([]);
+  // const cart = useContext(cartContext);
+  const [cartD, setCartD] = useState([]);
+  // const [loginState, setLoginState] = useState(false);
+  // const [user, loading, error] = useAuthState(auth);
+  const [name, setName] = useState("");
+  const [userAuth, setUserAuth] = useState({});
+  // const navigate = useNavigate();
+
+  const router = createBrowserRouter([
+    {
+      path: "/",
+      element: (
+        <>
+          <Nav_bar1
+            cartD={cartD}
+            userAuth={userAuth}
+            userAuthHandler={(d) => setUserAuth(d)}
+          />
+          <NavBar2 />
+        </>
+      ),
+      children: [
+        {
+          path: "/",
+          element: <Home />,
+        },
+        {
+          path: "detail/:id",
+          element: (
+            <>
+              <DetailCard
+                update={(data) => {
+                  setCartD([...cartD, data]);
+                  localStorage.setItem(data.id, true);
+                }}
+              />
+            </>
+          ),
+        },
+        {
+          path: "cart",
+          element: (
+            <Cart
+              data={cartD}
+              remove={remove}
+              
+              userAuth={userAuth}
+            ></Cart>
+          ),
+        },
+        {
+          path: "order",
+          element: <OrderPage />,
+        },
+        {
+          path: "login",
+          element: (
+            <Login userAuthHandler={(authDetail) => setUserAuth(authDetail)} />
+          ),
+        },
+        {
+          path: "payment",
+          element: <Payment />,
+          
+        },
+        {
+          path: "bank",
+          element: <Bank />,
+        },
+        {
+          path: "ccard",
+          element: <Ccard cartD={cartD} setCartD={setCartD} />,
+        },
+      ],
+    },
+  ]);
+
+  const cartData = useContext(cartContext);
+  // console.log(cartData);
+  function remove(id) {
+    const newCartD = cartD.filter((item) => {
+      return item.id !== id;
+    });
+    setCartD(newCartD);
+    localStorage.removeItem(id);
   }
 
-  handleClick = api => e => {
-    e.preventDefault()
+  useEffect(() => {
+    const dataApi = axios
+      .get(
+        "https://content.newtonschool.co/v1/pr/63b6c911af4f30335b4b3b89/products?limit=10&page=2"
+      )
+      .then((res) => {
+        setData((data) =>
+          res.data.map((val) => {
+            val.addedToCart = localStorage.getItem(val.id) ? true : false;
 
-    this.setState({ loading: true })
-    fetch("/.netlify/functions/" + api)
-      .then(response => response.json())
-      .then(json => this.setState({ loading: false, msg: json.msg }))
-  }
+            return val;
+          })
+        );
+      });
+    const email = localStorage.getItem("email");
+    const pass = localStorage.getItem("pass");
+    if (email && pass) {
+      logInWithEmailAndPassword(email, pass).then((res) =>
+        setUserAuth({ email: res.user.email })
+      );
+    }
+  }, []);
 
-  render() {
-    const { loading, msg } = this.state
+  useEffect(() => {
+    const arr = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = Number(localStorage.key(i));
 
-    return (
-      <p>
-        <button onClick={this.handleClick("hello")}>{loading ? "Loading..." : "Call Lambda"}</button>
-        <button onClick={this.handleClick("async-dadjoke")}>{loading ? "Loading..." : "Call Async Lambda"}</button>
-        <br />
-        <span>{msg}</span>
-      </p>
-    )
-  }
+      arr.push(...data.filter((item) => item.id === key));
+    }
+
+    setCartD(() => [...arr]);
+  }, [cartD.length, data.length]);
+
+  return (
+    <>
+      <DataApi.Provider value={data}>
+        <RouterProvider router={router}></RouterProvider>
+      </DataApi.Provider>
+    </>
+  );
 }
 
-class App extends Component {
-  render() {
-    return (
-      <div className="App">
-        <header className="App-header">
-          <img src={logo} className="App-logo" alt="logo" />
-          <p>
-            Edit <code>src/App.js</code> and save to reload.
-          </p>
-          <LambdaDemo />
-        </header>
-      </div>
-    )
-  }
-}
-
-export default App
+export default App;
